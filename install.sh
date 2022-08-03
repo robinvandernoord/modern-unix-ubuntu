@@ -154,7 +154,7 @@ function install_bat {
 function setup_bat_alias {
   bashrc="/home/$SUDO_USER/.bashrc"
 
-  which batcat > /dev/null 2> /dev/null || return
+  which batcat >/dev/null 2>/dev/null || return
 
   grep 'alias bat' $bashrc >/dev/null && warn "alias bat already exists" || gum confirm "Would you like to setup the alias 'bat' for 'batcat'?" && echo -e "\nalias bat=batcat\n" >>$bashrc
 }
@@ -175,7 +175,7 @@ function install_delta {
 
 function show_delta_git_setup {
   echo "Write this to your git config if you want to use delta for git:"
-  cat <<EOF
+  gum format -t code <<EOF
 # ~/.gitconfig
 [core]
     pager = delta
@@ -211,12 +211,12 @@ function install_broot {
 }
 
 function install_fd {
-    __install_apt "fd-find"
+  __install_apt "fd-find"
 }
 
 function setup_fd_alias {
-  which fd > /dev/null 2> /dev/null && warn "command fd already exists - not making alias" && return
-  which fdfind > /dev/null 2> /dev/null && (ln -s $(which fdfind) /usr/bin/fd) || warn "fd not installed - not making alias"
+  which fd >/dev/null 2>/dev/null && warn "command fd already exists - not making alias" && return
+  which fdfind >/dev/null 2>/dev/null && (ln -s $(which fdfind) /usr/bin/fd) || warn "fd not installed - not making alias"
 }
 
 function install_ripgrep {
@@ -236,13 +236,20 @@ function install {
   which $pkg >/dev/null && warn "$name already installed" || _install_tool "$name" "$description" $method
 }
 
-function main {
-  require_sudo
+function prepare {
+  require_sudo $*
   require_amd64
 
   # gum can't use install since _install_tool uses gum
   install_gum
+}
 
+function cleanup {
+    # todo: cleanup - rm tempdir
+    echo '-';
+}
+
+function install_one_by_one {
   install bat "Better cat" install_bat batcat
   setup_bat_alias
 
@@ -269,8 +276,38 @@ function main {
   # keep gum?
 }
 
-main
+function install_all {
+  install_bat
+  setup_bat_alias
+  install_exa
+  install_lsd
+  install_delta
+  show_delta_git_setup
+  install_dust
+  install_duf
+  install_broot
+  install_fd fdfind
+  setup_fd_alias
+  install_ripgrep
+  install_ag
+}
 
-# todo: remove flag
-# todo: menu with 1. install all; 2. install some; 3. remove all; 4. remove some
-# sudo apt remove -y gum git-delta lsd exa bat du-dust duf fd-find ripgrep silversearcher-ag ...
+function remove_all {
+  apt remove -y gum git-delta lsd exa bat du-dust duf fd-find ripgrep silversearcher-ag # ...
+  # todo: remove aliases?
+}
+
+function main {
+  prepare $*
+
+  option=$(gum choose "Install All" "Install Specific" "Remove All" "Remove Specific")
+
+  if [[ $option == "Install All" ]]; then install_all; fi;
+  if [[ $option == "Install Specific" ]]; then install_one_by_one; fi;
+  if [[ $option == "Remove All" ]]; then remove_all; fi;
+  if [[ $option == "Remove Specific" ]]; then fail 'currently not supported'; fi;
+
+  cleanup;
+}
+
+main $*
