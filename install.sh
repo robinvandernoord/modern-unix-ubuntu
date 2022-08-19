@@ -76,6 +76,10 @@ On_IWhite='\033[0;107m'  # White
 
 tempdir=$(mktemp -d)
 
+function untar {
+  tar -xf $*
+}
+
 function require_sudo {
   if [[ $UID != 0 ]]; then
     echo "Please run this script with sudo:"
@@ -156,7 +160,15 @@ function setup_bat_alias {
 
   which batcat >/dev/null 2>/dev/null || return
 
-  grep 'alias bat' $bashrc >/dev/null && warn "alias bat already exists" || gum confirm "Would you like to setup the alias 'bat' for 'batcat'?" && echo -e "\nalias bat=batcat\n" >>$bashrc
+  grep 'alias bat' $bashrc >/dev/null && warn "alias bat already exists" || (gum confirm "Would you like to setup the alias 'bat' for 'batcat'?" && echo -e "\nalias bat=batcat\n" >> $bashrc)
+}
+
+function setup_bottom_alias {
+  bashrc="/home/$SUDO_USER/.bashrc"
+
+  which btm >/dev/null 2>/dev/null || return
+
+  grep 'alias bottom' $bashrc >/dev/null && warn "alias bottom already exists" || (gum confirm "Would you like to setup the alias 'bottom' for 'btm'?" && echo -e "\nalias bottom=btm\n" >> $bashrc)
 }
 
 function install_exa {
@@ -207,7 +219,12 @@ function install_duf {
 }
 
 function install_broot {
-  fail "broot is currently not supported"
+  url="https://github.com/Canop/broot/releases/download/v1.14.2/broot_1.14.2.zip"
+  gum spin --spinner dot --title "wget broot" -- wget "$url" -O "$tempdir/broot.zip"
+  unzip "$tempdir/broot.zip" -d "$tempdir/broot" > /dev/null 2> /dev/null
+  mv "$tempdir/broot/x86_64-linux/broot" /usr/local/bin/broot
+  chmod +x /usr/local/bin/broot
+
 }
 
 function install_fd {
@@ -216,7 +233,7 @@ function install_fd {
 
 function setup_fd_alias {
   which fd >/dev/null 2>/dev/null && warn "command fd already exists - not making alias" && return
-  which fdfind >/dev/null 2>/dev/null && (ln -s $(which fdfind) /usr/bin/fd) || warn "fd not installed - not making alias"
+  which fdfind >/dev/null 2>/dev/null && (ln -s "$(which fdfind)" /usr/bin/fd) || warn "fd not installed - not making alias"
 }
 
 function install_ripgrep {
@@ -225,6 +242,72 @@ function install_ripgrep {
 
 function install_ag {
   __install_apt silversearcher-ag
+}
+
+function install_fzf {
+  __install_apt fzf
+}
+
+function install_mcfly {
+  url="https://github.com/cantino/mcfly/releases/download/v0.6.1/mcfly-v0.6.1-x86_64-unknown-linux-musl.tar.gz"
+  gum spin --spinner dot --title "wget mcfly" -- wget "$url" -O "$tempdir/mcfly.tar.gz"
+
+  untar "$tempdir/mcfly.tar.gz"
+  mv mcfly /usr/local/bin/mcfly
+}
+
+function install_choose {
+  url="https://github.com/theryangeary/choose/releases/download/v1.3.4/choose-x86_64-unknown-linux-gnu"
+  gum spin --spinner dot --title "wget choose" -- wget "$url" -O "$tempdir/choose"
+  mv "$tempdir/choose" /usr/local/bin/choose
+  chmod +x /usr/local/bin/choose
+}
+
+function install_jq {
+  url="https://github.com/stedolan/jq/releases/download/jq-1.6/jq-linux64"
+  gum spin --spinner dot --title "wget jq" -- wget "$url" -O "$tempdir/jq"
+  mv "$tempdir/jq" /usr/local/bin/jq
+  chmod +x /usr/local/bin/jq
+}
+
+function install_sd {
+  url="https://github.com/chmln/sd/releases/download/v0.7.6/sd-v0.7.6-x86_64-unknown-linux-gnu"
+  gum spin --spinner dot --title "wget sd" -- wget "$url" -O "$tempdir/sd"
+  mv "$tempdir/sd" /usr/local/bin/sd
+  chmod +x /usr/local/bin/sd
+}
+
+function install_cheat {
+  url="https://github.com/cheat/cheat/releases/download/4.3.1/cheat-linux-amd64.gz"
+  gum spin --spinner dot --title "wget cheat" -- wget "$url" -O "$tempdir/cheat.gz"
+  gunzip "$tempdir/cheat.gz"
+  mv "$tempdir/cheat" /usr/local/bin/cheat
+  chmod +x /usr/local/bin/cheat
+}
+
+function install_tldr {
+  if [[ $(which npm) ]]; then
+    # install with npm
+    npm install -g tldr
+  else
+    if [[ $(which pip3) ]]; then
+      # install with pip3
+      pip3 install tldr
+    else
+      if [[ $(which pip) ]]; then
+        # install with regular pip
+        pip install tldr
+      else
+        fail "npm or pip must be installed in order to install tldr!"
+      fi
+    fi
+  fi
+}
+
+function install_bottom {
+    url="https://github.com/ClementTsang/bottom/releases/download/0.6.8/bottom_0.6.8_amd64.deb"
+  __install_dpkg $url "bottom"
+  success "bottom can be used with the command 'btm'"
 }
 
 function install {
@@ -245,8 +328,8 @@ function prepare {
 }
 
 function cleanup {
-    # todo: cleanup - rm tempdir
-    echo '-';
+  # todo: cleanup - rm tempdir
+  echo '-'
 }
 
 function install_one_by_one {
@@ -272,6 +355,23 @@ function install_one_by_one {
 
   install ag "A code searching tool similar to ack, but faster." install_ag
 
+  install fzf "A general purpose command-line fuzzy finder." install_fzf
+
+  install mcfly "Fly through your shell history. Great Scott!" install_mcfly
+
+  install choose "A human-friendly and fast alternative to cut and (sometimes) awk" install_choose
+
+  install jq "sed for JSON data." install_jq
+
+  install sd "An intuitive find & replace CLI (sed alternative)." install_sd
+
+  install cheat "Create and view interactive cheatsheets on the command-line." install_cheat
+
+  install tldr "A community effort to simplify man pages with practical examples." install_tldr
+
+  install bottom "Yet another cross-platform graphical process/system monitor." install_bottom
+  setup_bottom_alias
+
   # ...
   # keep gum?
 }
@@ -290,24 +390,67 @@ function install_all {
   setup_fd_alias
   install_ripgrep
   install_ag
+  install_fzf
+  install_mcfly
+  install_choose
+  install_jq
+  install_sd
+  install_cheat
+  install_tldr
+  install_bottom
+  setup_bottom_alias
 }
 
 function remove_all {
-  apt remove -y gum git-delta lsd exa bat du-dust duf fd-find ripgrep silversearcher-ag # ...
+  apt remove -y git-delta lsd exa bat du-dust duf fd-find ripgrep silversearcher-ag fzf # ...
   # todo: remove aliases?
+  rm "$(which mcfly)" || echo "mcfly not installed"
+  rm "$(which choose)" || echo "choose not installed"
+  rm "$(which jq)" || echo "jq not installed"
+  rm "$(which sd)" || echo "sd not installed"
+  rm "$(which cheat)" || echo "cheat not installed"
+  rm "$(which broot)" || echo "broot not installed"
+
+  # tldr:
+  if [[ $(which npm) ]]; then
+    # install with npm
+    npm uninstall -g tldr
+  else
+    if [[ $(which pip3) ]]; then
+      # install with pip3
+      pip3 uninstall tldr
+    else
+      if [[ $(which pip) ]]; then
+        # install with regular pip
+        pip uninstall tldr
+      else
+        warn "npm or pip must be installed in order to (un)install tldr!"
+      fi
+    fi
+  fi
+
+  # apt remove -y gum
+
 }
 
 function main {
   prepare $*
 
+  if [[ $1 ]]; then
+    method="install_$1"
+    $method # execute
+    exit
+  fi
+  # else:
+
   option=$(gum choose "Install All" "Install Specific" "Remove All" "Remove Specific")
 
-  if [[ $option == "Install All" ]]; then install_all; fi;
-  if [[ $option == "Install Specific" ]]; then install_one_by_one; fi;
-  if [[ $option == "Remove All" ]]; then remove_all; fi;
-  if [[ $option == "Remove Specific" ]]; then fail 'currently not supported'; fi;
+  if [[ $option == "Install All" ]]; then install_all; fi
+  if [[ $option == "Install Specific" ]]; then install_one_by_one; fi
+  if [[ $option == "Remove All" ]]; then remove_all; fi
+  if [[ $option == "Remove Specific" ]]; then fail 'currently not supported'; fi
 
-  cleanup;
+  cleanup
 }
 
 main $*
